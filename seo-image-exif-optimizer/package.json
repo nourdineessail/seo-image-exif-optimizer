@@ -1,0 +1,9 @@
+{
+  "name": "seo-image-exif-optimizer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline image EXIF optimizer with optional free local AI marketplace keyword research.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

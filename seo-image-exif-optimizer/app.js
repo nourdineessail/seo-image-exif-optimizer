@@ -25,6 +25,8 @@ const els = {
   subject: document.getElementById("subject"),
   copyright: document.getElementById("copyright"),
   generateBtn: document.getElementById("generateBtn"),
+  aiResearchBtn: document.getElementById("aiResearchBtn"),
+  aiStatus: document.getElementById("aiStatus"),
   optimizeBtn: document.getElementById("optimizeBtn"),
   scorePill: document.getElementById("scorePill"),
   scoreDetail: document.getElementById("scoreDetail"),
@@ -32,6 +34,7 @@ const els = {
   filenameOutput: document.getElementById("filenameOutput"),
   embeddedOutput: document.getElementById("embeddedOutput"),
   altOutput: document.getElementById("altOutput"),
+  sourcesOutput: document.getElementById("sourcesOutput"),
   downloadBtn: document.getElementById("downloadBtn"),
   copyAltBtn: document.getElementById("copyAltBtn"),
 };
@@ -97,6 +100,10 @@ els.generateBtn.addEventListener("click", () => {
 
   updateScore();
   updateOutputs();
+});
+
+els.aiResearchBtn.addEventListener("click", async () => {
+  await runAiResearch();
 });
 
 els.form.addEventListener("input", () => {
@@ -197,6 +204,91 @@ async function optimizeImage() {
   els.embeddedOutput.textContent = type === "png" ? "Converted PNG to JPEG EXIF" : "JPEG EXIF";
   els.altOutput.textContent = meta.altText || "-";
   showToast("Metadata embedded without changing image pixels.");
+}
+
+async function runAiResearch() {
+  if (!state.file) {
+    showToast("Choose an image first.");
+    return;
+  }
+
+  const marketplaces = Array.from(document.querySelectorAll('input[name="marketplace"]:checked')).map((input) => input.value);
+  if (marketplaces.length === 0) {
+    showToast("Choose at least one marketplace.");
+    return;
+  }
+
+  els.aiResearchBtn.disabled = true;
+  els.aiStatus.textContent = "Analyzing image and searching marketplaces...";
+
+  try {
+    const imageDataUrl = await fileToJpegDataUrl(state.file, 1024, 0.86);
+    const response = await fetch("/api/ai-keywords", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageDataUrl,
+        marketplaces,
+        currentKeyword: els.primaryKeyword.value.trim(),
+        currentTitle: els.title.value.trim(),
+        originalName: state.file.name,
+      }),
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || "AI research failed.");
+    }
+
+    applyAiSuggestions(result);
+    renderSources(result.sources || []);
+    els.aiStatus.textContent = result.note || (result.usedWebSearch ? "Marketplace keywords applied." : "Keyword suggestions applied.");
+    showToast("AI keyword suggestions applied.");
+  } catch (error) {
+    els.aiStatus.textContent = error.message || "AI research failed.";
+    showToast(error.message || "AI research failed.");
+  } finally {
+    els.aiResearchBtn.disabled = false;
+  }
+}
+
+function applyAiSuggestions(result) {
+  setField(els.primaryKeyword, result.primaryKeyword);
+  setField(els.keywords, Array.isArray(result.keywords) ? result.keywords.join(", ") : result.keywords);
+  setField(els.title, result.title);
+  setField(els.altText, result.altText);
+  setField(els.description, result.description);
+  setField(els.subject, result.subject);
+  setField(els.creator, result.creator);
+  setField(els.copyright, result.copyright);
+  updateScore();
+  updateOutputs();
+}
+
+function setField(element, value) {
+  const clean = String(value || "").trim();
+  if (clean) element.value = clean;
+}
+
+function renderSources(sources) {
+  els.sourcesOutput.innerHTML = "";
+  if (!sources.length) {
+    const item = document.createElement("li");
+    item.textContent = "-";
+    els.sourcesOutput.appendChild(item);
+    return;
+  }
+
+  for (const source of sources.slice(0, 6)) {
+    const item = document.createElement("li");
+    const link = document.createElement("a");
+    link.href = source.url;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.textContent = source.title || source.url;
+    item.appendChild(link);
+    els.sourcesOutput.appendChild(item);
+  }
 }
 
 function collectMetadata() {
@@ -306,6 +398,24 @@ async function convertFileToJpegBytes(file) {
   });
 
   return new Uint8Array(await blob.arrayBuffer());
+}
+
+async function fileToJpegDataUrl(file, maxSide, quality) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(bitmap, 0, 0, width, height);
+  if (typeof bitmap.close === "function") bitmap.close();
+
+  return canvas.toDataURL("image/jpeg", quality);
 }
 
 function buildExifPayload(meta) {

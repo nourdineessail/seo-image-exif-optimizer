@@ -56,6 +56,23 @@
           </div>
           <div class="score-detail" id="scoreDetail">Missing: image, keyword, title, alt text, description, subject, creator or brand</div>
 
+          <section class="ai-research" aria-label="Marketplace keyword research">
+            <div>
+              <h3>Marketplace keyword research</h3>
+              <p>Uses free marketplace search results; local Ollama can add image understanding during local testing.</p>
+            </div>
+            <div class="marketplaces" aria-label="Marketplaces to search">
+              <label><input type="checkbox" name="marketplace" value="amazon" checked /> Amazon</label>
+              <label><input type="checkbox" name="marketplace" value="ebay" checked /> eBay</label>
+              <label><input type="checkbox" name="marketplace" value="walmart" checked /> Walmart</label>
+              <label><input type="checkbox" name="marketplace" value="etsy" /> Etsy</label>
+              <label><input type="checkbox" name="marketplace" value="sephora" /> Sephora</label>
+              <label><input type="checkbox" name="marketplace" value="ulta" /> Ulta</label>
+            </div>
+            <button type="button" class="secondary" id="aiResearchBtn">Find marketplace keywords</button>
+            <span id="aiStatus" class="ai-status">Vercel-ready free mode, no paid AI key</span>
+          </section>
+
           <form id="metadataForm" class="metadata-form">
             <label>
               <span>Primary keyword</span>
@@ -127,6 +144,13 @@
           <div class="output-card">
             <span>Alt text</span>
             <p id="altOutput">-</p>
+          </div>
+
+          <div class="output-card sources-card">
+            <span>AI sources</span>
+            <ul id="sourcesOutput">
+              <li>-</li>
+            </ul>
           </div>
 
           <div class="button-stack">
