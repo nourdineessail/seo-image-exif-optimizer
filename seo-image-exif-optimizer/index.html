@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SEO Image EXIF Optimizer</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace" aria-label="SEO image metadata optimizer">
+        <aside class="panel upload-panel">
+          <div class="brand-row">
+            <div class="mark" aria-hidden="true">IO</div>
+            <div>
+              <h1>SEO Image EXIF Optimizer</h1>
+              <p>Convert images to JPEG and inject keyword-rich EXIF metadata.</p>
+            </div>
+          </div>
+
+          <label class="drop-zone" id="dropZone">
+            <input id="imageInput" type="file" accept="image/jpeg,image/png" />
+            <span class="drop-icon" aria-hidden="true">+</span>
+            <span class="drop-title">Choose or drop an image</span>
+            <span class="drop-meta">JPEG and PNG input, JPEG download</span>
+          </label>
+
+          <div class="preview-frame" id="previewFrame">
+            <img id="previewImage" alt="" />
+            <div class="empty-preview" id="emptyPreview">Preview</div>
+          </div>
+
+          <dl class="file-facts" id="fileFacts">
+            <div>
+              <dt>File</dt>
+              <dd id="factName">No image selected</dd>
+            </div>
+            <div>
+              <dt>Type</dt>
+              <dd id="factType">-</dd>
+            </div>
+            <div>
+              <dt>Size</dt>
+              <dd id="factSize">-</dd>
+            </div>
+          </dl>
+        </aside>
+
+        <section class="panel editor-panel">
+          <div class="toolbar">
+            <div>
+              <h2>Metadata</h2>
+              <p>Use natural search terms. Avoid stuffing repeated keywords.</p>
+            </div>
+            <div class="score-pill" id="scorePill">SEO score 0%</div>
+          </div>
+          <div class="score-detail" id="scoreDetail">Missing: image, keyword, title, alt text, description, subject, creator or brand</div>
+
+          <form id="metadataForm" class="metadata-form">
+            <label>
+              <span>Primary keyword</span>
+              <input id="primaryKeyword" name="primaryKeyword" type="text" placeholder="modern kitchen cabinet" autocomplete="off" />
+            </label>
+
+            <label>
+              <span>Supporting keywords</span>
+              <textarea id="keywords" name="keywords" rows="3" placeholder="custom cabinetry, white oak kitchen, built-in pantry"></textarea>
+            </label>
+
+            <div class="grid-2">
+              <label>
+                <span>Image title</span>
+                <input id="title" name="title" type="text" placeholder="White oak modern kitchen cabinet" />
+              </label>
+
+              <label>
+                <span>Creator or brand</span>
+                <input id="creator" name="creator" type="text" placeholder="Brand name" />
+              </label>
+            </div>
+
+            <label>
+              <span>Alt text</span>
+              <textarea id="altText" name="altText" rows="2" placeholder="Modern white oak kitchen cabinet with integrated pantry storage"></textarea>
+            </label>
+
+            <label>
+              <span>Description</span>
+              <textarea id="description" name="description" rows="4" placeholder="Describe the image in one clear, useful sentence for search engines and accessibility."></textarea>
+            </label>
+
+            <div class="grid-2">
+              <label>
+                <span>Subject</span>
+                <input id="subject" name="subject" type="text" placeholder="Kitchen remodeling" />
+              </label>
+
+              <label>
+                <span>Copyright</span>
+                <input id="copyright" name="copyright" type="text" placeholder="Copyright 2026 Brand" />
+              </label>
+            </div>
+
+            <div class="actions">
+              <button type="button" class="secondary" id="generateBtn">Generate suggestions</button>
+              <button type="submit" class="primary" id="optimizeBtn">Optimize image</button>
+            </div>
+          </form>
+        </section>
+
+        <aside class="panel output-panel">
+          <div class="output-header">
+            <h2>Output</h2>
+            <span id="outputStatus">Waiting</span>
+          </div>
+
+          <div class="output-card">
+            <span>Download filename</span>
+            <strong id="filenameOutput">-</strong>
+          </div>
+
+          <div class="output-card">
+            <span>Embedded fields</span>
+            <strong id="embeddedOutput">-</strong>
+          </div>
+
+          <div class="output-card">
+            <span>Alt text</span>
+            <p id="altOutput">-</p>
+          </div>
+
+          <div class="button-stack">
+            <button type="button" class="primary" id="downloadBtn" disabled>Download optimized image</button>
+            <button type="button" class="secondary" id="copyAltBtn" disabled>Copy alt text</button>
+          </div>
+
+          <div class="notes">
+            <h3>What gets written</h3>
+            <ul>
+              <li>All downloads are JPEG files with EXIF metadata.</li>
+              <li>PNG transparency is flattened onto a white background.</li>
+              <li>The score is a metadata completeness check.</li>
+            </ul>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
