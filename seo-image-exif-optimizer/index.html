@@ -19,10 +19,10 @@
           </div>
 
           <label class="drop-zone" id="dropZone">
-            <input id="imageInput" type="file" accept="image/jpeg,image/png" />
+            <input id="imageInput" type="file" accept="image/*,.avif,.webp,.heic,.heif,.bmp,.gif,.tif,.tiff" />
             <span class="drop-icon" aria-hidden="true">+</span>
             <span class="drop-title">Choose or drop an image</span>
-            <span class="drop-meta">JPEG and PNG input, JPEG download</span>
+            <span class="drop-meta">AVIF, WebP, PNG, JPEG and more; JPEG download</span>
           </label>
 
           <div class="preview-frame" id="previewFrame">
@@ -161,8 +161,8 @@
           <div class="notes">
             <h3>What gets written</h3>
             <ul>
-              <li>All downloads are JPEG files with EXIF metadata.</li>
-              <li>PNG transparency is flattened onto a white background.</li>
+              <li>All browser-decodable images download as JPEG files with EXIF metadata.</li>
+              <li>Transparency is flattened onto a white background.</li>
               <li>The score is a metadata completeness check.</li>
             </ul>
           </div>

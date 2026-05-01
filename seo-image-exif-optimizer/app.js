@@ -140,6 +140,11 @@ els.copyAltBtn.addEventListener("click", async () => {
 });
 
 async function loadFile(file) {
+  if (!file.type.startsWith("image/") && !looksLikeImageName(file.name)) {
+    showToast("Choose an image file.");
+    return;
+  }
+
   state.file = file;
   state.bytes = new Uint8Array(await file.arrayBuffer());
   state.outputBlob = null;
@@ -177,16 +182,17 @@ async function optimizeImage() {
     return;
   }
 
-  const type = detectImageType(state.bytes, state.file.type);
+  const type = detectImageType(state.bytes, state.file.type, state.file.name);
+  const sourceLabel = imageTypeLabel(type, state.file.type, state.file.name);
   let optimized;
   try {
     if (type === "jpeg") {
       optimized = injectJpegExif(state.bytes, meta);
-    } else if (type === "png") {
+    } else if (type !== "unknown") {
       const jpegBytes = await convertFileToJpegBytes(state.file);
       optimized = injectJpegExif(jpegBytes, meta);
     } else {
-      showToast("Only JPEG and PNG input is supported.");
+      showToast("This image format is not supported by your browser.");
       return;
     }
   } catch (error) {
@@ -201,7 +207,7 @@ async function optimizeImage() {
   els.copyAltBtn.disabled = !meta.altText;
   els.outputStatus.textContent = "Optimized";
   els.filenameOutput.textContent = state.outputName;
-  els.embeddedOutput.textContent = type === "png" ? "Converted PNG to JPEG EXIF" : "JPEG EXIF";
+  els.embeddedOutput.textContent = type === "jpeg" ? "JPEG EXIF" : `Converted ${sourceLabel} to JPEG EXIF`;
   els.altOutput.textContent = meta.altText || "-";
   showToast("Metadata embedded without changing image pixels.");
 }
@@ -534,12 +540,30 @@ function pngTextChunk(keyword, value) {
   return chunk;
 }
 
-function detectImageType(bytes, mime) {
+function detectImageType(bytes, mime, name = "") {
   if (bytes && bytes[0] === 0xff && bytes[1] === 0xd8) return "jpeg";
   if (bytes && bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71) return "png";
+  if (bytes && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && hasAscii(bytes, 8, "WEBP")) return "webp";
+  if (bytes && hasAscii(bytes, 4, "ftypavif")) return "avif";
   if (mime === "image/jpeg") return "jpeg";
-  if (mime === "image/png") return "png";
+  if (mime && mime.startsWith("image/")) return "image";
+  if (looksLikeImageName(name)) return "image";
   return "unknown";
+}
+
+function imageTypeLabel(type, mime, name = "") {
+  if (type === "jpeg") return "JPEG";
+  if (type === "png") return "PNG";
+  if (type === "webp") return "WebP";
+  if (type === "avif") return "AVIF";
+  if (mime?.startsWith("image/")) return mime.replace("image/", "").toUpperCase();
+  const extension = String(name || "").match(/\.([a-z0-9]+)$/i)?.[1];
+  if (extension) return extension.toUpperCase();
+  return "image";
+}
+
+function looksLikeImageName(name) {
+  return /\.(avif|webp|heic|heif|bmp|gif|jpe?g|png|tiff?)$/i.test(String(name || ""));
 }
 
 function buildSeoFilename(originalName, meta) {
