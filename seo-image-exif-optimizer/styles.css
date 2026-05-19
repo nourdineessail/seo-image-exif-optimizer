@@ -219,7 +219,7 @@ span {
 
 .file-facts div {
   display: grid;
-  grid-template-columns: 58px 1fr;
+  grid-template-columns: 74px 1fr;
   gap: 10px;
   align-items: start;
   border-bottom: 1px solid var(--line);
@@ -424,6 +424,24 @@ button:disabled {
   padding-left: 18px;
   display: grid;
   gap: 6px;
+}
+
+.format-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.format-options label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.format-options input {
+  width: auto;
 }
 
 .sources-card a {

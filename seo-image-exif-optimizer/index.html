@@ -43,6 +43,22 @@
               <dt>Size</dt>
               <dd id="factSize">-</dd>
             </div>
+            <div>
+              <dt>Format</dt>
+              <dd id="factFormat">-</dd>
+            </div>
+            <div>
+              <dt>Pixels</dt>
+              <dd id="factDimensions">-</dd>
+            </div>
+            <div>
+              <dt>MP</dt>
+              <dd id="factPixels">-</dd>
+            </div>
+            <div>
+              <dt>Ratio</dt>
+              <dd id="factAspect">-</dd>
+            </div>
           </dl>
         </aside>
 
@@ -137,6 +153,14 @@
           </div>
 
           <div class="output-card">
+            <span>Download format</span>
+            <div class="format-options">
+              <label><input type="radio" name="outputFormat" value="jpeg" checked /> JPEG with EXIF</label>
+              <label><input type="radio" name="outputFormat" value="webp" /> WebP</label>
+            </div>
+          </div>
+
+          <div class="output-card">
             <span>Embedded fields</span>
             <strong id="embeddedOutput">-</strong>
           </div>
@@ -161,7 +185,8 @@
           <div class="notes">
             <h3>What gets written</h3>
             <ul>
-              <li>All browser-decodable images download as JPEG files with EXIF metadata.</li>
+              <li>JPEG downloads include EXIF metadata.</li>
+              <li>WebP downloads use browser conversion without EXIF embedding.</li>
               <li>Transparency is flattened onto a white background.</li>
               <li>The score is a metadata completeness check.</li>
             </ul>

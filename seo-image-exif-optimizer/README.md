@@ -4,7 +4,7 @@ A small offline browser tool for injecting SEO-focused image metadata.
 
 ## Use
 
-Open `index.html` in a browser, upload an image, fill the metadata fields, and download the optimized JPEG. JPEG, PNG, WebP, AVIF, GIF, BMP, and other browser-decodable image formats are accepted; output is always JPEG.
+Open `index.html` in a browser, upload an image, fill the metadata fields, and download the optimized file. JPEG, PNG, WebP, AVIF, GIF, BMP, and other browser-decodable image formats are accepted. Output can be JPEG or WebP.
 
 For Vercel deployment, deploy the `seo-image-exif-optimizer` folder. The app includes a serverless endpoint at `api/ai-keywords.js`, so no paid AI key is required.
 
@@ -26,8 +26,9 @@ npm start
 
 ## Supported output
 
-- JPEG input: writes a fresh EXIF APP1 segment with title, subject, keywords, comment, description, artist, copyright, software, and timestamp fields.
-- Other image input: converts to JPEG first, flattening transparency onto a white background, then writes the EXIF fields.
+- JPEG output: writes a fresh EXIF APP1 segment with title, subject, keywords, comment, description, artist, copyright, software, and timestamp fields.
+- WebP output: converts through the browser WebP encoder. EXIF metadata is not embedded in WebP output.
+- Converted output flattens transparency onto a white background.
 
 The tool suggests a clean keyword-based filename without adding a forced suffix.
 

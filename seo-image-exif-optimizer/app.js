@@ -15,6 +15,10 @@ const els = {
   factName: document.getElementById("factName"),
   factType: document.getElementById("factType"),
   factSize: document.getElementById("factSize"),
+  factFormat: document.getElementById("factFormat"),
+  factDimensions: document.getElementById("factDimensions"),
+  factPixels: document.getElementById("factPixels"),
+  factAspect: document.getElementById("factAspect"),
   form: document.getElementById("metadataForm"),
   primaryKeyword: document.getElementById("primaryKeyword"),
   keywords: document.getElementById("keywords"),
@@ -116,6 +120,16 @@ els.form.addEventListener("submit", async (event) => {
   await optimizeImage();
 });
 
+document.querySelectorAll('input[name="outputFormat"]').forEach((input) => {
+  input.addEventListener("change", () => {
+    state.outputBlob = null;
+    state.outputName = "";
+    els.downloadBtn.disabled = true;
+    els.outputStatus.textContent = state.file ? "Ready" : "Waiting";
+    updateOutputs();
+  });
+});
+
 els.downloadBtn.addEventListener("click", () => {
   if (!state.outputBlob) return;
   const url = URL.createObjectURL(state.outputBlob);
@@ -158,6 +172,18 @@ async function loadFile(file) {
   els.factName.textContent = file.name;
   els.factType.textContent = file.type || "Unknown";
   els.factSize.textContent = formatBytes(file.size);
+  els.factFormat.textContent = imageTypeLabel(detectImageType(state.bytes, file.type, file.name), file.type, file.name);
+
+  try {
+    const info = await getImageInfo(file);
+    els.factDimensions.textContent = `${info.width} x ${info.height}`;
+    els.factPixels.textContent = `${(info.width * info.height / 1000000).toFixed(2)} MP`;
+    els.factAspect.textContent = aspectRatio(info.width, info.height);
+  } catch {
+    els.factDimensions.textContent = "Browser decode failed";
+    els.factPixels.textContent = "-";
+    els.factAspect.textContent = "-";
+  }
 
   if (!els.primaryKeyword.value.trim()) {
     els.primaryKeyword.value = wordsFromFilename(file.name);
@@ -172,7 +198,7 @@ async function loadFile(file) {
 
 async function optimizeImage() {
   if (!state.file || !state.bytes) {
-    showToast("Choose a JPEG or PNG first.");
+    showToast("Choose an image first.");
     return;
   }
 
@@ -182,34 +208,44 @@ async function optimizeImage() {
     return;
   }
 
+  const outputFormat = getOutputFormat();
   const type = detectImageType(state.bytes, state.file.type, state.file.name);
   const sourceLabel = imageTypeLabel(type, state.file.type, state.file.name);
   let optimized;
   try {
-    if (type === "jpeg") {
-      optimized = injectJpegExif(state.bytes, meta);
-    } else if (type !== "unknown") {
-      const jpegBytes = await convertFileToJpegBytes(state.file);
-      optimized = injectJpegExif(jpegBytes, meta);
+    if (outputFormat === "webp") {
+      optimized = await convertFileToImageBlob(state.file, "image/webp", 0.86);
     } else {
-      showToast("This image format is not supported by your browser.");
-      return;
+      if (type === "jpeg") {
+        optimized = injectJpegExif(state.bytes, meta);
+      } else if (type !== "unknown") {
+        const jpegBytes = await convertFileToJpegBytes(state.file);
+        optimized = injectJpegExif(jpegBytes, meta);
+      } else {
+        showToast("This image format is not supported by your browser.");
+        return;
+      }
     }
   } catch (error) {
     showToast(error.message || "Could not write image metadata.");
     return;
   }
 
-  state.outputBlob = new Blob([optimized], { type: "image/jpeg" });
-  state.outputName = buildSeoFilename(state.file.name, meta);
+  state.outputBlob = outputFormat === "webp" ? optimized : new Blob([optimized], { type: "image/jpeg" });
+  state.outputName = buildSeoFilename(state.file.name, meta, outputFormat === "webp" ? "webp" : "jpg");
 
   els.downloadBtn.disabled = false;
   els.copyAltBtn.disabled = !meta.altText;
   els.outputStatus.textContent = "Optimized";
   els.filenameOutput.textContent = state.outputName;
-  els.embeddedOutput.textContent = type === "jpeg" ? "JPEG EXIF" : `Converted ${sourceLabel} to JPEG EXIF`;
+  els.embeddedOutput.textContent =
+    outputFormat === "webp"
+      ? `Converted ${sourceLabel} to WebP`
+      : type === "jpeg"
+        ? "JPEG EXIF"
+        : `Converted ${sourceLabel} to JPEG EXIF`;
   els.altOutput.textContent = meta.altText || "-";
-  showToast("Metadata embedded without changing image pixels.");
+  showToast(outputFormat === "webp" ? "WebP image created." : "Metadata embedded without changing image pixels.");
 }
 
 async function runAiResearch() {
@@ -339,7 +375,7 @@ function updateScore() {
 
 function updateOutputs() {
   const meta = collectMetadata();
-  els.filenameOutput.textContent = state.file ? buildSeoFilename(state.file.name, meta) : "-";
+  els.filenameOutput.textContent = state.file ? buildSeoFilename(state.file.name, meta, getOutputFormat() === "webp" ? "webp" : "jpg") : "-";
   els.altOutput.textContent = meta.altText || "-";
   els.embeddedOutput.textContent = meta.keywords.length ? `${meta.keywords.length} keyword${meta.keywords.length === 1 ? "" : "s"} prepared` : "-";
 }
@@ -381,6 +417,11 @@ function injectJpegExif(bytes, meta) {
 }
 
 async function convertFileToJpegBytes(file) {
+  const blob = await convertFileToImageBlob(file, "image/jpeg", 0.92);
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+async function convertFileToImageBlob(file, mimeType, quality) {
   const bitmap = await createImageBitmap(file);
   const canvas = document.createElement("canvas");
   canvas.width = bitmap.width;
@@ -392,18 +433,16 @@ async function convertFileToJpegBytes(file) {
   context.drawImage(bitmap, 0, 0);
   if (typeof bitmap.close === "function") bitmap.close();
 
-  const blob = await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     canvas.toBlob(
       (result) => {
         if (result) resolve(result);
-        else reject(new Error("Could not convert this image to JPEG."));
+        else reject(new Error(`Could not convert this image to ${mimeType}.`));
       },
-      "image/jpeg",
-      0.92,
+      mimeType,
+      quality,
     );
   });
-
-  return new Uint8Array(await blob.arrayBuffer());
 }
 
 async function fileToJpegDataUrl(file, maxSide, quality) {
@@ -566,10 +605,30 @@ function looksLikeImageName(name) {
   return /\.(avif|webp|heic|heif|bmp|gif|jpe?g|png|tiff?)$/i.test(String(name || ""));
 }
 
-function buildSeoFilename(originalName, meta) {
+function buildSeoFilename(originalName, meta, extension = "jpg") {
   const source = [meta.primaryKeyword, meta.title, meta.subject, wordsFromFilename(originalName)].find(Boolean) || "optimized-image";
   const slug = slugify(source).slice(0, 80) || "optimized-image";
-  return `${slug}.jpg`;
+  return `${slug}.${extension}`;
+}
+
+function getOutputFormat() {
+  return document.querySelector('input[name="outputFormat"]:checked')?.value || "jpeg";
+}
+
+async function getImageInfo(file) {
+  const bitmap = await createImageBitmap(file);
+  const info = { width: bitmap.width, height: bitmap.height };
+  if (typeof bitmap.close === "function") bitmap.close();
+  return info;
+}
+
+function aspectRatio(width, height) {
+  const divisor = gcd(width, height);
+  return `${width / divisor}:${height / divisor}`;
+}
+
+function gcd(a, b) {
+  return b === 0 ? a : gcd(b, a % b);
 }
 
 function parseKeywords(value) {
