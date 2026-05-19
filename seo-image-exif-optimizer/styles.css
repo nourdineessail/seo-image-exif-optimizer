@@ -217,7 +217,8 @@ span {
   gap: 8px;
 }
 
-.file-facts div {
+.file-facts div,
+.metadata-readout dl div {
   display: grid;
   grid-template-columns: 74px 1fr;
   gap: 10px;
@@ -226,14 +227,32 @@ span {
   padding-bottom: 8px;
 }
 
-.file-facts dt {
+.file-facts dt,
+.metadata-readout dt {
   color: var(--muted);
 }
 
-.file-facts dd {
+.file-facts dd,
+.metadata-readout dd {
   margin: 0;
   font-weight: 650;
   overflow-wrap: anywhere;
+}
+
+.metadata-readout {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.metadata-readout h2 {
+  margin-bottom: 10px;
+}
+
+.metadata-readout dl {
+  margin: 0;
+  display: grid;
+  gap: 8px;
 }
 
 .toolbar,

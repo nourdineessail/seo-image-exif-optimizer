@@ -19,6 +19,7 @@ const els = {
   factDimensions: document.getElementById("factDimensions"),
   factPixels: document.getElementById("factPixels"),
   factAspect: document.getElementById("factAspect"),
+  existingMetadata: document.getElementById("existingMetadata"),
   form: document.getElementById("metadataForm"),
   primaryKeyword: document.getElementById("primaryKeyword"),
   keywords: document.getElementById("keywords"),
@@ -184,6 +185,8 @@ async function loadFile(file) {
     els.factPixels.textContent = "-";
     els.factAspect.textContent = "-";
   }
+
+  renderExistingMetadata(readExistingMetadata(state.bytes, file.type, file.name));
 
   if (!els.primaryKeyword.value.trim()) {
     els.primaryKeyword.value = wordsFromFilename(file.name);
@@ -601,6 +604,167 @@ function imageTypeLabel(type, mime, name = "") {
   return "image";
 }
 
+function readExistingMetadata(bytes, mime, name) {
+  const type = detectImageType(bytes, mime, name);
+  try {
+    if (type === "jpeg") return readJpegMetadata(bytes);
+    if (type === "png") return readPngMetadata(bytes);
+    if (type === "webp") return readWebpMetadata(bytes);
+  } catch {
+    return [{ key: "Status", value: "Could not read metadata" }];
+  }
+  return [{ key: "Status", value: "No readable metadata parser for this format" }];
+}
+
+function renderExistingMetadata(items) {
+  els.existingMetadata.innerHTML = "";
+  const cleanItems = items.filter((item) => item.value);
+  const rows = cleanItems.length ? cleanItems : [{ key: "Status", value: "No readable metadata found" }];
+
+  for (const item of rows.slice(0, 18)) {
+    const row = document.createElement("div");
+    const key = document.createElement("dt");
+    const value = document.createElement("dd");
+    key.textContent = item.key;
+    value.textContent = item.value;
+    row.append(key, value);
+    els.existingMetadata.appendChild(row);
+  }
+}
+
+function readJpegMetadata(bytes) {
+  const items = [];
+  let offset = 2;
+  while (offset + 4 <= bytes.length && bytes[offset] === 0xff) {
+    const marker = bytes[offset + 1];
+    if (marker === 0xda || marker === 0xd9) break;
+    const length = readUint16(bytes, offset + 2);
+    const start = offset + 4;
+    const end = offset + 2 + length;
+    if (end > bytes.length) break;
+
+    if (marker === 0xe1 && hasAscii(bytes, start, "Exif\0\0")) {
+      items.push(...readExifItems(bytes.slice(start + 6, end)));
+    } else if (marker === 0xe1 && hasAscii(bytes, start, "http://ns.adobe.com/xap/1.0/\0")) {
+      const xmpStart = start + "http://ns.adobe.com/xap/1.0/\0".length;
+      items.push({ key: "XMP", value: compactSentence(latin1String(bytes, xmpStart, end)).slice(0, 260) });
+    } else if (marker === 0xfe) {
+      items.push({ key: "Comment", value: compactSentence(latin1String(bytes, start, end)) });
+    }
+    offset = end;
+  }
+  return uniqueMetadata(items);
+}
+
+function readExifItems(tiff) {
+  const little = tiff[0] === 0x49 && tiff[1] === 0x49;
+  const big = tiff[0] === 0x4d && tiff[1] === 0x4d;
+  if (!little && !big) return [];
+
+  const read16 = (offset) => (little ? tiff[offset] | (tiff[offset + 1] << 8) : (tiff[offset] << 8) | tiff[offset + 1]);
+  const read32 = (offset) =>
+    little
+      ? (tiff[offset] | (tiff[offset + 1] << 8) | (tiff[offset + 2] << 16) | (tiff[offset + 3] << 24)) >>> 0
+      : ((tiff[offset] << 24) | (tiff[offset + 1] << 16) | (tiff[offset + 2] << 8) | tiff[offset + 3]) >>> 0;
+
+  const tagNames = {
+    0x010e: "Description",
+    0x010f: "Camera",
+    0x0110: "Model",
+    0x0131: "Software",
+    0x0132: "Date",
+    0x013b: "Artist",
+    0x8298: "Copyright",
+    0x9c9b: "Title",
+    0x9c9c: "Comment",
+    0x9c9d: "Author",
+    0x9c9e: "Keywords",
+    0x9c9f: "Subject",
+  };
+
+  const items = [];
+  const firstIfd = read32(4);
+  readIfd(firstIfd, items);
+  return items;
+
+  function readIfd(ifdOffset, output) {
+    if (!ifdOffset || ifdOffset + 2 > tiff.length) return;
+    const count = read16(ifdOffset);
+    for (let index = 0; index < count; index += 1) {
+      const entry = ifdOffset + 2 + index * 12;
+      if (entry + 12 > tiff.length) break;
+      const tag = read16(entry);
+      const type = read16(entry + 2);
+      const countValue = read32(entry + 4);
+      const totalSize = (tagTypeSize[type] || 1) * countValue;
+      const valueOffset = totalSize <= 4 ? entry + 8 : read32(entry + 8);
+      if (tagNames[tag]) {
+        const value = readExifValue(tiff, valueOffset, totalSize, type, tag);
+        if (value) output.push({ key: tagNames[tag], value });
+      }
+    }
+  }
+}
+
+function readExifValue(tiff, offset, totalSize, type, tag) {
+  if (offset < 0 || offset + totalSize > tiff.length) return "";
+  const slice = tiff.slice(offset, offset + totalSize);
+  if (tag >= 0x9c9b && tag <= 0x9c9f) return compactSentence(utf16LeString(slice).replace(/\0+$/g, ""));
+  if (type === 2) return compactSentence(latin1String(slice, 0, slice.length).replace(/\0+$/g, ""));
+  if (type === 1 || type === 7) return compactSentence(latin1String(slice, 0, slice.length).replace(/\0+$/g, ""));
+  return "";
+}
+
+function readPngMetadata(bytes) {
+  const items = [];
+  let offset = 8;
+  while (offset + 12 <= bytes.length) {
+    const length = readUint32(bytes, offset);
+    const type = latin1String(bytes, offset + 4, offset + 8);
+    const start = offset + 8;
+    const end = start + length;
+    if (end + 4 > bytes.length) break;
+
+    if (type === "tEXt") {
+      const zero = bytes.indexOf(0, start);
+      if (zero > start && zero < end) {
+        items.push({ key: latin1String(bytes, start, zero), value: compactSentence(latin1String(bytes, zero + 1, end)) });
+      }
+    } else if (type === "iTXt" || type === "zTXt") {
+      items.push({ key: type, value: "Compressed or international text metadata present" });
+    }
+
+    offset = end + 4;
+  }
+  return uniqueMetadata(items);
+}
+
+function readWebpMetadata(bytes) {
+  const items = [];
+  let offset = 12;
+  while (offset + 8 <= bytes.length) {
+    const chunkType = latin1String(bytes, offset, offset + 4);
+    const size = readUint32LE(bytes, offset + 4);
+    const start = offset + 8;
+    const end = start + size;
+    if (end > bytes.length) break;
+    if (chunkType === "EXIF") items.push(...readExifItems(bytes.slice(start, end)));
+    if (chunkType === "XMP ") items.push({ key: "XMP", value: compactSentence(latin1String(bytes, start, end)).slice(0, 260) });
+    offset = end + (size % 2);
+  }
+  return uniqueMetadata(items);
+}
+
+function uniqueMetadata(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = `${item.key}:${item.value}`;
+    if (!item.value || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function looksLikeImageName(name) {
   return /\.(avif|webp|heic|heif|bmp|gif|jpe?g|png|tiff?)$/i.test(String(name || ""));
 }
@@ -740,6 +904,10 @@ function readUint32(bytes, offset) {
   return ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0;
 }
 
+function readUint32LE(bytes, offset) {
+  return (bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16) | (bytes[offset + 3] << 24)) >>> 0;
+}
+
 function writeUint16(bytes, offset, value) {
   bytes[offset] = (value >>> 8) & 0xff;
   bytes[offset + 1] = value & 0xff;
@@ -770,6 +938,22 @@ function hasAscii(bytes, offset, text) {
     if (bytes[offset + index] !== text.charCodeAt(index)) return false;
   }
   return true;
+}
+
+function latin1String(bytes, start, end) {
+  let value = "";
+  for (let index = start; index < end; index += 1) {
+    value += String.fromCharCode(bytes[index]);
+  }
+  return value;
+}
+
+function utf16LeString(bytes) {
+  let value = "";
+  for (let index = 0; index + 1 < bytes.length; index += 2) {
+    value += String.fromCharCode(bytes[index] | (bytes[index + 1] << 8));
+  }
+  return value;
 }
 
 function concatUint8(parts) {
